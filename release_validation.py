@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import quote
 
 GITHUB_BASE = "https://github.com"
 
@@ -71,6 +73,23 @@ def print_header():
     print("=" * 70)
 
 
+def get_github_credentials():
+    username = os.environ.get("GITHUB_USERNAME") or os.environ.get("GITHUB_USER")
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+    return username, token
+
+
+def build_repo_url(repo, username=None, token=None):
+    repo_url = f"{GITHUB_BASE}/{repo}.git"
+
+    if username and token:
+        encoded_user = quote(username, safe="")
+        encoded_token = quote(token, safe="")
+        return f"https://{encoded_user}:{encoded_token}@github.com/{repo}.git"
+
+    return repo_url
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -81,12 +100,14 @@ def main():
 
     args = parser.parse_args()
 
-    repo_url = f"{GITHUB_BASE}/{args.repo}.git"
+    username, token = get_github_credentials()
+    repo_url = build_repo_url(args.repo, username, token)
+    display_repo_url = f"{GITHUB_BASE}/{args.repo}.git"
 
     print_header()
 
     print(f"Repository      : {args.repo}")
-    print(f"Repository URL  : {repo_url}")
+    print(f"Repository URL  : {display_repo_url}")
     print(f"Old Release     : {args.old}")
     print(f"Current Release : {args.current}")
     print()
