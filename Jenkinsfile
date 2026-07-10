@@ -6,7 +6,6 @@ pipeline {
         string(name: 'REPOSITORY', defaultValue: '', description: 'Repository in owner/name format for single-repo validation')
         string(name: 'OLD_RELEASE', defaultValue: '', description: 'Previous release/branch/tag for single-repo validation')
         string(name: 'CURRENT_RELEASE', defaultValue: '', description: 'Current release/branch/tag for single-repo validation')
-        file(name: 'COMPARISON_CSV', description: 'Optional CSV upload with columns: repo, old, current')
         text(name: 'COMPARISON_CSV_CONTENT', defaultValue: '', description: 'Optional CSV content pasted directly in Jenkins; columns: repo, old, current')
     }
 
@@ -27,84 +26,51 @@ pipeline {
                         def timestamp = new Date().format('yyyyMMdd_HHmmss')
                         def reportFileName = "release_validation_report_${timestamp}.txt"
                         def reportFile = "${env.WORKSPACE}/${reportFileName}"
+
+                        // remove any previous report files in the workspace
+                        sh "find '${env.WORKSPACE}' -maxdepth 1 -type f -name 'release_validation_report_*.txt' -delete"
+
                         def useSingleRepo = params.REPOSITORY?.trim() && params.OLD_RELEASE?.trim() && params.CURRENT_RELEASE?.trim()
                         def csvPath = ''
-                        def csvParam = params.COMPARISON_CSV
 
                         env.REPORT_FILE_NAME = reportFileName
 
                         if (useSingleRepo) {
                             echo "Using single-repo inputs from Jenkins parameters"
                         } else {
-                            def candidatePaths = []
+                            echo "CSV content parameter length: ${params.COMPARISON_CSV_CONTENT?.size() ?: 0}"
 
-                            if (csvParam != null && csvParam != '') {
-                                echo "Found file parameter: ${csvParam}"
-                                candidatePaths << csvParam.toString()
-
-                                try {
-                                    if (csvParam.metaClass.respondsTo(csvParam, 'getLocation')) {
-                                        def location = csvParam.getLocation()
-                                        if (location) {
-                                            candidatePaths << location.toString()
-                                        }
-                                    }
-                                } catch (Exception ignored) {}
-
-                                try {
-                                    if (csvParam.metaClass.respondsTo(csvParam, 'getFile')) {
-                                        def fileRef = csvParam.getFile()
-                                        if (fileRef) {
-                                            candidatePaths << fileRef.absolutePath
-                                        }
-                                    }
-                                } catch (Exception ignored) {}
-                            }
-
-                            if (!csvPath && candidatePaths) {
-                                for (path in candidatePaths) {
-                                    if (path && new File(path).exists()) {
-                                        csvPath = path
-                                        break
-                                    }
-                                }
-                            }
-
-                            if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
+                            // require pasted CSV content now that file upload support is not used
+                            if (params.COMPARISON_CSV_CONTENT?.trim()) {
                                 writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
                                 csvPath = "${env.WORKSPACE}/comparisons.csv"
-                            }
-
-                            if (!csvPath) {
-                                def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | sort | tail -n 1", returnStdout: true).trim()
-                                if (foundCsv) {
-                                    csvPath = foundCsv
-                                }
+                                // show a short preview for debugging
+                                sh "echo '--- CSV preview (first 200 lines):' && sed -n '1,200p' '${csvPath}' || true"
                             }
 
                             if (csvPath) {
-                                echo "Using CSV file: ${csvPath}"
+                                echo "Resolved CSV path: ${csvPath}"
                             } else {
-                                echo "No CSV file resolved from upload parameter"
+                                echo "No CSV file found in workspace"
                             }
                         }
 
                         if (useSingleRepo) {
                             sh """
                             python3 release_validation.py \
-                              --repo "${params.REPOSITORY}" \
-                              --old "${params.OLD_RELEASE}" \
-                              --current "${params.CURRENT_RELEASE}" \
-                              --report-file "${reportFile}"
+                              --repo \"${params.REPOSITORY}\" \
+                              --old \"${params.OLD_RELEASE}\" \
+                              --current \"${params.CURRENT_RELEASE}\" \
+                              --report-file \"${reportFile}\"
                             """
                         } else if (csvPath) {
                             sh """
                             python3 release_validation.py \
-                              --csv "${csvPath}" \
-                              --report-file "${reportFile}"
+                              --csv \"${csvPath}\" \
+                              --report-file \"${reportFile}\"
                             """
                         } else {
-                            error('Provide single-repo values or upload a CSV file before running the build.')
+                            error('Provide single-repo values or paste CSV content into COMPARISON_CSV_CONTENT before running the build.')
                         }
                     }
                 }
