@@ -13,7 +13,6 @@ pipeline {
     stages {
 
         stage('Prepare Upload') {
-            agent { label 'master' }
             steps {
                 script {
                     // look for an uploaded CSV in the master's workspace and stash it so agents can use it
