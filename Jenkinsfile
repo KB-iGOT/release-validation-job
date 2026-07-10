@@ -27,7 +27,7 @@ pipeline {
                         def timestamp = new Date().format('yyyyMMdd_HHmmss')
                         def reportFileName = "release_validation_report_${timestamp}.txt"
                         def reportFile = "${env.WORKSPACE}/${reportFileName}"
-                        sh "rm -f \"${env.WORKSPACE}/release_validation_report_*.txt\""
+                        sh "find '${env.WORKSPACE}' -maxdepth 1 -type f -name 'release_validation_report_*.txt' -delete"
                         def useSingleRepo = params.REPOSITORY?.trim() && params.OLD_RELEASE?.trim() && params.CURRENT_RELEASE?.trim()
                         def csvPath = ''
                         def csvParam = params.COMPARISON_CSV
