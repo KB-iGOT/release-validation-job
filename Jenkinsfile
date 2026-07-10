@@ -12,6 +12,23 @@ pipeline {
 
     stages {
 
+        stage('Prepare Upload') {
+            agent { label 'master' }
+            steps {
+                script {
+                    // look for an uploaded CSV in the master's workspace and stash it so agents can use it
+                    def found = sh(script: "find '${env.WORKSPACE}' -maxdepth 1 -type f -name '*.csv' | sort | tail -n 1 || true", returnStdout: true).trim()
+                    if (found) {
+                        echo "Found uploaded CSV on master: ${found}"
+                        sh "cp '${found}' '${env.WORKSPACE}/comparisons.csv'"
+                        stash name: 'uploaded-csv', includes: 'comparisons.csv', allowEmpty: false
+                    } else {
+                        echo 'No uploaded CSV found on master.'
+                    }
+                }
+            }
+        }
+
         stage('Release Validation') {
 
             steps {
@@ -47,6 +64,17 @@ pipeline {
                                 writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
                                 csvPath = "${env.WORKSPACE}/comparisons.csv"
                             }
+
+                                // try to unstash a CSV that was prepared on the master node
+                                try {
+                                    unstash 'uploaded-csv'
+                                    def unstashed = "${env.WORKSPACE}/comparisons.csv"
+                                    if (new File(unstashed).exists()) {
+                                        csvPath = unstashed
+                                    }
+                                } catch (Exception ignored) {
+                                    // no stashed CSV available
+                                }
 
                             if (!csvPath) {
                                 def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | sort | tail -n 1", returnStdout: true).trim()
