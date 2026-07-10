@@ -24,6 +24,8 @@ pipeline {
                     )
                 ]) {
                     script {
+                        def timestamp = new Date().format('yyyyMMdd_HHmmss')
+                        def reportFile = "${env.WORKSPACE}/release_validation_report_${timestamp}.txt"
                         def csvPath = ''
                         def csvParam = params.COMPARISON_CSV
 
@@ -71,7 +73,7 @@ pipeline {
                             sh """
                             python3 release_validation.py \
                               --csv "${csvPath}" \
-                              --report-file "${env.WORKSPACE}/release_validation_report.txt"
+                              --report-file "${reportFile}"
                             """
                         } else {
                             sh """
@@ -84,6 +86,12 @@ pipeline {
                     }
                 }
 
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: "release_validation_report_*.txt", allowEmptyArchive: true
+                }
             }
 
         }
