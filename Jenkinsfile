@@ -27,6 +27,7 @@ pipeline {
                         def timestamp = new Date().format('yyyyMMdd_HHmmss')
                         def reportFileName = "release_validation_report_${timestamp}.txt"
                         def reportFile = "${env.WORKSPACE}/${reportFileName}"
+                        sh "rm -f '${env.WORKSPACE}/release_validation_report_*.txt'"
                         def useSingleRepo = params.REPOSITORY?.trim() && params.OLD_RELEASE?.trim() && params.CURRENT_RELEASE?.trim()
                         def csvPath = ''
                         def csvParam = params.COMPARISON_CSV
@@ -79,6 +80,20 @@ pipeline {
                                 def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | sort | tail -n 1", returnStdout: true).trim()
                                 if (foundCsv) {
                                     csvPath = foundCsv
+                                }
+                            }
+
+                            if (!csvPath) {
+                                def workspaceRoot = new File(env.WORKSPACE ?: '.')
+                                def csvFiles = []
+                                workspaceRoot.eachFileRecurse { file ->
+                                    if (file.isFile() && file.name.toLowerCase().endsWith('.csv')) {
+                                        csvFiles << file
+                                    }
+                                }
+                                if (csvFiles) {
+                                    csvFiles.sort { it.lastModified() }
+                                    csvPath = csvFiles[-1].absolutePath
                                 }
                             }
 
