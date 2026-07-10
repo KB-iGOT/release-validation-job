@@ -2,6 +2,14 @@ pipeline {
 
     agent any
 
+    parameters {
+        string(name: 'REPOSITORY', defaultValue: '', description: 'Repository in owner/name format for single-repo validation')
+        string(name: 'OLD_RELEASE', defaultValue: '', description: 'Previous release/branch/tag for single-repo validation')
+        string(name: 'CURRENT_RELEASE', defaultValue: '', description: 'Current release/branch/tag for single-repo validation')
+        file(name: 'COMPARISON_CSV', description: 'Optional CSV upload with columns: repo, old, current')
+        text(name: 'COMPARISON_CSV_CONTENT', defaultValue: '', description: 'Optional CSV content pasted directly in Jenkins; columns: repo, old, current')
+    }
+
     stages {
 
         stage('Release Validation') {
@@ -15,14 +23,75 @@ pipeline {
                         passwordVariable: 'GITHUB_TOKEN'
                     )
                 ]) {
-                    sh """
-                    python3 release_validation.py \
-                      --repo "${params.REPOSITORY}" \
-                      --old "${params.OLD_RELEASE}" \
-                      --current "${params.CURRENT_RELEASE}"
-                    """
+                    script {
+                        def timestamp = new Date().format('yyyyMMdd_HHmmss')
+                        def reportFile = "${env.WORKSPACE}/release_validation_report_${timestamp}.txt"
+                        def csvPath = ''
+                        def csvParam = params.COMPARISON_CSV
+
+                        if (csvParam != null && csvParam != '') {
+                            if (csvParam instanceof String) {
+                                csvPath = csvParam
+                            } else {
+                                try {
+                                    csvPath = csvParam.getLocation()
+                                } catch (Exception ignored) {
+                                    csvPath = ''
+                                }
+
+                                if (!csvPath) {
+                                    try {
+                                        csvPath = csvParam.getFile().absolutePath
+                                    } catch (Exception ignored) {
+                                        csvPath = ''
+                                    }
+                                }
+
+                                if (!csvPath) {
+                                    try {
+                                        csvPath = csvParam.getOriginalName()
+                                    } catch (Exception ignored) {
+                                        csvPath = ''
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
+                            writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
+                            csvPath = "${env.WORKSPACE}/comparisons.csv"
+                        }
+
+                        if (!csvPath) {
+                            def workspaceCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | head -n 5", returnStdout: true).trim()
+                            if (workspaceCsv) {
+                                csvPath = workspaceCsv.split("\\n")[0]
+                            }
+                        }
+
+                        if (csvPath) {
+                            sh """
+                            python3 release_validation.py \
+                              --csv "${csvPath}" \
+                              --report-file "${reportFile}"
+                            """
+                        } else {
+                            sh """
+                            python3 release_validation.py \
+                              --repo "${params.REPOSITORY}" \
+                              --old "${params.OLD_RELEASE}" \
+                              --current "${params.CURRENT_RELEASE}"
+                            """
+                        }
+                    }
                 }
 
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: "release_validation_report_*.txt", allowEmptyArchive: true
+                }
             }
 
         }
