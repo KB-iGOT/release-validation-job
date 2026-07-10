@@ -37,22 +37,27 @@ pipeline {
                             echo "Using single-repo inputs from Jenkins parameters"
                         } else {
                             if (csvParam != null && csvParam != '') {
-                                if (csvParam instanceof String) {
-                                    csvPath = csvParam
-                                } else {
-                                    try {
-                                        csvPath = csvParam.getLocation()
-                                    } catch (Exception ignored) {
-                                        csvPath = ''
-                                    }
+                                echo "Found file parameter: ${csvParam}"
+                            }
 
-                                    if (!csvPath) {
-                                        try {
-                                            csvPath = csvParam.getFile().absolutePath
-                                        } catch (Exception ignored) {
-                                            csvPath = ''
-                                        }
+                            def workspaceFiles = sh(script: "dir /b \"${env.WORKSPACE}\"", returnStdout: true).trim()
+                            echo "Workspace files:\n${workspaceFiles}"
+
+                            if (csvParam != null && csvParam != '') {
+                                try {
+                                    def uploadedFile = new File(csvParam.toString())
+                                    if (uploadedFile.exists()) {
+                                        csvPath = uploadedFile.absolutePath
                                     }
+                                } catch (Exception ignored) {
+                                    csvPath = ''
+                                }
+                            }
+
+                            if (!csvPath) {
+                                def foundCsv = sh(script: "for /f \"delims=\" %i in ('dir /s /b \"${env.WORKSPACE}\\*.csv\" 2^>nul') do @echo %i & exit /b 0", returnStdout: true).trim()
+                                if (foundCsv) {
+                                    csvPath = foundCsv
                                 }
                             }
 
@@ -62,7 +67,9 @@ pipeline {
                             }
 
                             if (csvPath) {
-                                echo "Using uploaded CSV file: ${csvPath}"
+                                echo "Using CSV file: ${csvPath}"
+                            } else {
+                                echo "No CSV file resolved from upload parameter"
                             }
                         }
 
