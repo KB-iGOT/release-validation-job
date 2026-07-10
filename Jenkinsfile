@@ -61,7 +61,7 @@ pipeline {
 
                             // fallback: look for any CSV file in workspace
                             if (!csvPath) {
-                                def foundCsv = sh(script: 'find "${env.WORKSPACE}" -type f \( -name "*.csv" -o -name "COMPARISON_CSV" \) | sort | tail -n 1', returnStdout: true).trim()
+                                def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f \\(-name '*.csv' -o -name 'COMPARISON_CSV'\\) | sort | tail -n 1", returnStdout: true).trim()
                                 if (foundCsv) {
                                     csvPath = foundCsv
                                 }
