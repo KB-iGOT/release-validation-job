@@ -42,5 +42,5 @@ KB-iGOT/cbp-api,cbrelease-4.8.33,cbrelease-4.8.37
 ## Jenkins Usage
 
 - For a single repository, fill the `REPOSITORY`, `OLD_RELEASE`, and `CURRENT_RELEASE` parameters.
-- For multiple repositories, either upload a CSV file using the `COMPARISON_CSV` parameter or paste CSV content into `COMPARISON_CSV_CONTENT` before running the build.
+- For multiple repositories, paste CSV content into `COMPARISON_CSV_CONTENT` before running the build.
 - The generated report is archived as a Jenkins artifact with a timestamped filename.
