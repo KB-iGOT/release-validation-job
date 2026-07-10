@@ -25,63 +25,63 @@ pipeline {
                 ]) {
                     script {
                         def timestamp = new Date().format('yyyyMMdd_HHmmss')
-                        def reportFile = "${env.WORKSPACE}/release_validation_report_${timestamp}.txt"
+                        def reportFileName = "release_validation_report_${timestamp}.txt"
+                        def reportFile = "${env.WORKSPACE}/${reportFileName}"
+                        def useSingleRepo = params.REPOSITORY?.trim() && params.OLD_RELEASE?.trim() && params.CURRENT_RELEASE?.trim()
                         def csvPath = ''
                         def csvParam = params.COMPARISON_CSV
 
-                        if (csvParam != null && csvParam != '') {
-                            if (csvParam instanceof String) {
-                                csvPath = csvParam
-                            } else {
-                                try {
-                                    csvPath = csvParam.getLocation()
-                                } catch (Exception ignored) {
-                                    csvPath = ''
-                                }
+                        env.REPORT_FILE_NAME = reportFileName
 
-                                if (!csvPath) {
+                        if (useSingleRepo) {
+                            echo "Using single-repo inputs from Jenkins parameters"
+                        } else {
+                            if (csvParam != null && csvParam != '') {
+                                if (csvParam instanceof String) {
+                                    csvPath = csvParam
+                                } else {
                                     try {
-                                        csvPath = csvParam.getFile().absolutePath
+                                        csvPath = csvParam.getLocation()
                                     } catch (Exception ignored) {
                                         csvPath = ''
                                     }
-                                }
 
-                                if (!csvPath) {
-                                    try {
-                                        csvPath = csvParam.getOriginalName()
-                                    } catch (Exception ignored) {
-                                        csvPath = ''
+                                    if (!csvPath) {
+                                        try {
+                                            csvPath = csvParam.getFile().absolutePath
+                                        } catch (Exception ignored) {
+                                            csvPath = ''
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
-                            writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
-                            csvPath = "${env.WORKSPACE}/comparisons.csv"
-                        }
+                            if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
+                                writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
+                                csvPath = "${env.WORKSPACE}/comparisons.csv"
+                            }
 
-                        if (!csvPath) {
-                            def workspaceCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | head -n 5", returnStdout: true).trim()
-                            if (workspaceCsv) {
-                                csvPath = workspaceCsv.split("\\n")[0]
+                            if (csvPath) {
+                                echo "Using uploaded CSV file: ${csvPath}"
                             }
                         }
 
-                        if (csvPath) {
+                        if (useSingleRepo) {
+                            sh """
+                            python3 release_validation.py \
+                              --repo "${params.REPOSITORY}" \
+                              --old "${params.OLD_RELEASE}" \
+                              --current "${params.CURRENT_RELEASE}" \
+                              --report-file "${reportFile}"
+                            """
+                        } else if (csvPath) {
                             sh """
                             python3 release_validation.py \
                               --csv "${csvPath}" \
                               --report-file "${reportFile}"
                             """
                         } else {
-                            sh """
-                            python3 release_validation.py \
-                              --repo "${params.REPOSITORY}" \
-                              --old "${params.OLD_RELEASE}" \
-                              --current "${params.CURRENT_RELEASE}"
-                            """
+                            error('Provide single-repo values or upload a CSV file before running the build.')
                         }
                     }
                 }
@@ -90,7 +90,7 @@ pipeline {
 
             post {
                 always {
-                    archiveArtifacts artifacts: "release_validation_report_*.txt", allowEmptyArchive: true
+                    archiveArtifacts artifacts: "${env.REPORT_FILE_NAME}", allowEmptyArchive: true
                 }
             }
 
