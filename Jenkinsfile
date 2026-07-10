@@ -83,18 +83,10 @@ pipeline {
                                 }
                             }
 
-                            if (!csvPath) {
-                                def workspaceRoot = new File(env.WORKSPACE ?: '.')
-                                def csvFiles = []
-                                workspaceRoot.eachFileRecurse { file ->
-                                    if (file.isFile() && file.name.toLowerCase().endsWith('.csv')) {
-                                        csvFiles << file
-                                    }
-                                }
-                                if (csvFiles) {
-                                    csvFiles.sort { it.lastModified() }
-                                    csvPath = csvFiles[-1].absolutePath
-                                }
+                            if (csvPath) {
+                                echo "Resolved CSV path: ${csvPath}"
+                            } else {
+                                echo "No CSV file found in workspace"
                             }
 
                             if (csvPath) {
