@@ -76,22 +76,9 @@ pipeline {
                             }
 
                             if (!csvPath) {
-                                def workspaceRoot = new File(env.WORKSPACE ?: '.')
-                                def csvFiles = []
-                                workspaceRoot.eachFileRecurse { file ->
-                                    if (file.isFile() && file.name.toLowerCase().endsWith('.csv')) {
-                                        csvFiles << file
-                                    }
-                                }
-
-                                if (csvFiles) {
-                                    csvFiles.sort { it.lastModified() }
-                                    for (csvFile in csvFiles) {
-                                        if (csvFile.exists()) {
-                                            csvPath = csvFile.absolutePath
-                                            break
-                                        }
-                                    }
+                                def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | sort | tail -n 1", returnStdout: true).trim()
+                                if (foundCsv) {
+                                    csvPath = foundCsv
                                 }
                             }
 
