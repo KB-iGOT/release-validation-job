@@ -36,34 +36,63 @@ pipeline {
                         if (useSingleRepo) {
                             echo "Using single-repo inputs from Jenkins parameters"
                         } else {
+                            def candidatePaths = []
+
                             if (csvParam != null && csvParam != '') {
                                 echo "Found file parameter: ${csvParam}"
-                            }
+                                candidatePaths << csvParam.toString()
 
-                            def workspaceFiles = sh(script: "dir /b \"${env.WORKSPACE}\"", returnStdout: true).trim()
-                            echo "Workspace files:\n${workspaceFiles}"
-
-                            if (csvParam != null && csvParam != '') {
                                 try {
-                                    def uploadedFile = new File(csvParam.toString())
-                                    if (uploadedFile.exists()) {
-                                        csvPath = uploadedFile.absolutePath
+                                    if (csvParam.metaClass.respondsTo(csvParam, 'getLocation')) {
+                                        def location = csvParam.getLocation()
+                                        if (location) {
+                                            candidatePaths << location.toString()
+                                        }
                                     }
-                                } catch (Exception ignored) {
-                                    csvPath = ''
-                                }
+                                } catch (Exception ignored) {}
+
+                                try {
+                                    if (csvParam.metaClass.respondsTo(csvParam, 'getFile')) {
+                                        def fileRef = csvParam.getFile()
+                                        if (fileRef) {
+                                            candidatePaths << fileRef.absolutePath
+                                        }
+                                    }
+                                } catch (Exception ignored) {}
                             }
 
-                            if (!csvPath) {
-                                def foundCsv = sh(script: "for /f \"delims=\" %i in ('dir /s /b \"${env.WORKSPACE}\\*.csv\" 2^>nul') do @echo %i & exit /b 0", returnStdout: true).trim()
-                                if (foundCsv) {
-                                    csvPath = foundCsv
+                            if (!csvPath && candidatePaths) {
+                                for (path in candidatePaths) {
+                                    if (path && new File(path).exists()) {
+                                        csvPath = path
+                                        break
+                                    }
                                 }
                             }
 
                             if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
                                 writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
                                 csvPath = "${env.WORKSPACE}/comparisons.csv"
+                            }
+
+                            if (!csvPath) {
+                                def workspaceRoot = new File(env.WORKSPACE ?: '.')
+                                def csvFiles = []
+                                workspaceRoot.eachFileRecurse { file ->
+                                    if (file.isFile() && file.name.toLowerCase().endsWith('.csv')) {
+                                        csvFiles << file
+                                    }
+                                }
+
+                                if (csvFiles) {
+                                    csvFiles.sort { it.lastModified() }
+                                    for (csvFile in csvFiles) {
+                                        if (csvFile.exists()) {
+                                            csvPath = csvFile.absolutePath
+                                            break
+                                        }
+                                    }
+                                }
                             }
 
                             if (csvPath) {
