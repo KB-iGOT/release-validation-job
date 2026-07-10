@@ -37,39 +37,11 @@ pipeline {
                         if (useSingleRepo) {
                             echo "Using single-repo inputs from Jenkins parameters"
                         } else {
-                            def candidatePaths = []
+                            echo "CSV parameter value: ${csvParam}"
+                            echo "CSV content parameter length: ${params.COMPARISON_CSV_CONTENT?.size() ?: 0}"
 
-                            if (csvParam != null && csvParam != '') {
-                                echo "Found file parameter: ${csvParam}"
-                                candidatePaths << csvParam.toString()
-
-                                try {
-                                    if (csvParam.metaClass.respondsTo(csvParam, 'getLocation')) {
-                                        def location = csvParam.getLocation()
-                                        if (location) {
-                                            candidatePaths << location.toString()
-                                        }
-                                    }
-                                } catch (Exception ignored) {}
-
-                                try {
-                                    if (csvParam.metaClass.respondsTo(csvParam, 'getFile')) {
-                                        def fileRef = csvParam.getFile()
-                                        if (fileRef) {
-                                            candidatePaths << fileRef.absolutePath
-                                        }
-                                    }
-                                } catch (Exception ignored) {}
-                            }
-
-                            if (!csvPath && candidatePaths) {
-                                for (path in candidatePaths) {
-                                    if (path && new File(path).exists()) {
-                                        csvPath = path
-                                        break
-                                    }
-                                }
-                            }
+                            def workspaceFiles = sh(script: "find '${env.WORKSPACE}' -maxdepth 1 -type f | sort", returnStdout: true).trim()
+                            echo "Workspace files:\n${workspaceFiles}"
 
                             if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
                                 writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
@@ -85,13 +57,9 @@ pipeline {
 
                             if (csvPath) {
                                 echo "Resolved CSV path: ${csvPath}"
-                            } else {
-                                echo "No CSV file found in workspace"
-                            }
-
-                            if (csvPath) {
                                 echo "Using CSV file: ${csvPath}"
                             } else {
+                                echo "No CSV file found in workspace"
                                 echo "No CSV file resolved from upload parameter"
                             }
                         }
