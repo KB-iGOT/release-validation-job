@@ -65,19 +65,19 @@ pipeline {
                         }
 
                         if (useSingleRepo) {
-                            sh '''
+                            sh """
                             python3 release_validation.py \
-                              --repo "${params.REPOSITORY}" \
-                              --old "${params.OLD_RELEASE}" \
-                              --current "${params.CURRENT_RELEASE}" \
-                              --report-file "${reportFile}"
-                            '''
+                              --repo \"${params.REPOSITORY}\" \
+                              --old \"${params.OLD_RELEASE}\" \
+                              --current \"${params.CURRENT_RELEASE}\" \
+                              --report-file \"${reportFile}\"
+                            """
                         } else if (csvPath) {
-                            sh '''
+                            sh """
                             python3 release_validation.py \
-                              --csv "${csvPath}" \
-                              --report-file "${reportFile}"
-                            '''
+                              --csv \"${csvPath}\" \
+                              --report-file \"${reportFile}\"
+                            """
                         } else {
                             error('Provide single-repo values or paste CSV content into COMPARISON_CSV_CONTENT before running the build.')
                         }
