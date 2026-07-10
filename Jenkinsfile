@@ -40,6 +40,7 @@ pipeline {
                             echo "Using single-repo inputs from Jenkins parameters"
                         } else {
                             echo "CSV content parameter length: ${params.COMPARISON_CSV_CONTENT?.size() ?: 0}"
+                            echo "Uploaded file environment variable: ${env.COMPARISON_CSV}"
 
                             // prefer pasted CSV content
                             if (params.COMPARISON_CSV_CONTENT?.trim()) {
@@ -49,9 +50,18 @@ pipeline {
                                 sh "echo '--- CSV preview (first 200 lines):' && sed -n '1,200p' '${csvPath}' || true"
                             }
 
+                            // fallback: use the uploaded file parameter workspace location if present
+                            if (!csvPath) {
+                                def uploadedLocation = "${env.WORKSPACE}/COMPARISON_CSV"
+                                if (fileExists(uploadedLocation)) {
+                                    csvPath = uploadedLocation
+                                    echo "Using uploaded file parameter path: ${csvPath}"
+                                }
+                            }
+
                             // fallback: look for any CSV file in workspace
                             if (!csvPath) {
-                                def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | sort | tail -n 1", returnStdout: true).trim()
+                                def foundCsv = sh(script: "find '${env.WORKSPACE}' -type f \( -name '*.csv' -o -name 'COMPARISON_CSV' \) | sort | tail -n 1", returnStdout: true).trim()
                                 if (foundCsv) {
                                     csvPath = foundCsv
                                 }
