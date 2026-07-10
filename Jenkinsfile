@@ -25,13 +25,46 @@ pipeline {
                 ]) {
                     script {
                         def csvPath = ''
-                        if (params.COMPARISON_CSV != null && params.COMPARISON_CSV != '') {
-                            csvPath = params.COMPARISON_CSV.toString()
+                        def csvParam = params.COMPARISON_CSV
+
+                        if (csvParam != null && csvParam != '') {
+                            if (csvParam instanceof String) {
+                                csvPath = csvParam
+                            } else {
+                                try {
+                                    csvPath = csvParam.getLocation()
+                                } catch (Exception ignored) {
+                                    csvPath = ''
+                                }
+
+                                if (!csvPath) {
+                                    try {
+                                        csvPath = csvParam.getFile().absolutePath
+                                    } catch (Exception ignored) {
+                                        csvPath = ''
+                                    }
+                                }
+
+                                if (!csvPath) {
+                                    try {
+                                        csvPath = csvParam.getOriginalName()
+                                    } catch (Exception ignored) {
+                                        csvPath = ''
+                                    }
+                                }
+                            }
                         }
 
                         if (!csvPath && params.COMPARISON_CSV_CONTENT?.trim()) {
                             writeFile file: "${env.WORKSPACE}/comparisons.csv", text: params.COMPARISON_CSV_CONTENT
                             csvPath = "${env.WORKSPACE}/comparisons.csv"
+                        }
+
+                        if (!csvPath) {
+                            def workspaceCsv = sh(script: "find '${env.WORKSPACE}' -type f -name '*.csv' | head -n 5", returnStdout: true).trim()
+                            if (workspaceCsv) {
+                                csvPath = workspaceCsv.split("\\n")[0]
+                            }
                         }
 
                         if (csvPath) {
