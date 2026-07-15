@@ -172,6 +172,45 @@ def parse_comparison_rows(csv_path):
     return comparisons
 
 
+def get_cherry_pick_statuses(repo_dir, current_ref, old_ref, commit_shas):
+    statuses = {}
+
+    if not commit_shas:
+        return statuses
+
+    cherry_output = run(
+        ["git", "cherry", current_ref, old_ref],
+        cwd=repo_dir,
+        check=False
+    )
+
+    if cherry_output.returncode != 0:
+        for sha in commit_shas:
+            statuses[sha] = "unknown"
+        return statuses
+
+    for line in cherry_output.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        marker = line[0]
+        if marker not in {"-", "+"}:
+            continue
+
+        parts = line[1:].strip().split(None, 1)
+        if not parts:
+            continue
+
+        sha = parts[0]
+        statuses[sha] = "cherry-picked" if marker == "-" else "not-cherry-picked"
+
+    for sha in commit_shas:
+        statuses.setdefault(sha, "unknown")
+
+    return statuses
+
+
 def compare_repo(repo, old_release, current_release, username=None, token=None):
     report_lines = []
 
@@ -285,13 +324,29 @@ def compare_repo(repo, old_release, current_release, username=None, token=None):
         add("Missing Commits")
         add("-" * 70)
 
-        for line in log.stdout.splitlines():
+        commit_rows = [line for line in log.stdout.splitlines() if line.strip()]
+        commit_shas = []
+
+        for line in commit_rows:
             sha, author, date, message = line.split("|", 3)
+            commit_shas.append(sha)
+
+        cherry_pick_statuses = get_cherry_pick_statuses(
+            tempdir,
+            current_ref,
+            old_ref,
+            commit_shas
+        )
+
+        for line in commit_rows:
+            sha, author, date, message = line.split("|", 3)
+            status = cherry_pick_statuses.get(sha, "unknown")
 
             add(f"Commit : {sha}")
             add(f"Author : {author}")
             add(f"Date   : {date}")
             add(f"Message: {message}")
+            add(f"Cherry-pick status : {status}")
 
             files = run(
                 [
@@ -312,6 +367,12 @@ def compare_repo(repo, old_release, current_release, username=None, token=None):
                     add(f"   - {file_name}")
 
             add("-" * 70)
+
+        add("Cherry-pick summary")
+        add("-" * 70)
+        add(f"Cherry-picked        : {sum(1 for value in cherry_pick_statuses.values() if value == 'cherry-picked')}")
+        add(f"Not cherry-picked    : {sum(1 for value in cherry_pick_statuses.values() if value == 'not-cherry-picked')}")
+        add(f"Unknown status       : {sum(1 for value in cherry_pick_statuses.values() if value == 'unknown')}")
 
         return {"status": "missing_commits", "report_lines": report_lines}
 
