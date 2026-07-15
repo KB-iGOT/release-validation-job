@@ -341,12 +341,17 @@ def compare_repo(repo, old_release, current_release, username=None, token=None):
         for line in commit_rows:
             sha, author, date, message = line.split("|", 3)
             status = cherry_pick_statuses.get(sha, "unknown")
+            status_text = {
+                "cherry-picked": "Equivalent patch exists in current release",
+                "not-cherry-picked": "No equivalent patch found in current release",
+                "unknown": "Unable to determine from git cherry"
+            }
 
             add(f"Commit : {sha}")
             add(f"Author : {author}")
             add(f"Date   : {date}")
             add(f"Message: {message}")
-            add(f"Cherry-pick status : {status}")
+            add(f"Cherry-pick status : {status_text.get(status, status)}")
 
             files = run(
                 [
