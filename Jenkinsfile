@@ -15,6 +15,11 @@ pipeline {
 
             steps {
 
+                checkout scm
+
+                echo "Workspace: ${env.WORKSPACE}"
+                sh "git rev-parse HEAD && echo '---' && git status --short"
+
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'github-cred',
@@ -57,7 +62,7 @@ pipeline {
 
                         if (useSingleRepo) {
                             sh """
-                            python3 release_validation.py \
+                            python3 \"${env.WORKSPACE}/release_validation.py\" \
                               --repo \"${params.REPOSITORY}\" \
                               --old \"${params.OLD_RELEASE}\" \
                               --current \"${params.CURRENT_RELEASE}\" \
@@ -65,7 +70,7 @@ pipeline {
                             """
                         } else if (csvPath) {
                             sh """
-                            python3 release_validation.py \
+                            python3 \"${env.WORKSPACE}/release_validation.py\" \
                               --csv \"${csvPath}\" \
                               --report-file \"${reportFile}\"
                             """
